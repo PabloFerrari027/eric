@@ -4,7 +4,17 @@ import { writeData } from "./write-data";
 import { openExcelFile } from "./open-excel-file";
 
 const filePath = "./SKU_DROP.xlsx";
-const skus: Array<string> = ["TS756.01", "TS755.01"];
+const skus: Array<string> = [
+  "TS751.01",
+  "TS752.01",
+  "TS753.01",
+  "TS754.01",
+  "TS755.01",
+  "TS756.01",
+  "TS757.01",
+  "TS758.01",
+  "TS759.01",
+];
 
 async function main(): Promise<void> {
   try {
@@ -14,10 +24,16 @@ async function main(): Promise<void> {
     await ensureFileAccess(filePath);
 
     const currentRows = await readData({ filePath });
-    await writeData({ currentRows, filePath, skus });
+    const hasNewData = await writeData({ currentRows, filePath, skus });
 
-    // Abre o arquivo Excel automaticamente após a criação/atualização
-    await openExcelFile(filePath);
+    // Abre o arquivo Excel apenas se houver novos dados
+    if (hasNewData) {
+      await openExcelFile(filePath);
+    } else {
+      console.log(
+        "ℹ️  Nenhum novo dado para processar. Planilha não foi alterada."
+      );
+    }
   } catch (error: any) {
     console.error("❌ Erro ao processar dados:", error.message);
     throw error;

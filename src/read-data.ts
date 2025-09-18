@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import { Rows } from "./types";
-import { workbook } from "./workbook";
+import { Workbook } from "exceljs";
 
 interface Input {
   filePath: string;
@@ -9,23 +9,60 @@ interface Input {
 export async function readData(input: Input): Promise<Rows> {
   const isFileExists = fs.existsSync(input.filePath);
 
-  if (!isFileExists) return [];
+  if (!isFileExists) {
+    console.log("📄 Arquivo não existe, será criado com os novos dados.");
+    return [];
+  }
 
-  await workbook.xlsx.readFile(input.filePath);
+  try {
+    const workbook = new Workbook();
+    await workbook.xlsx.readFile(input.filePath);
 
-  const worksheet = workbook.getWorksheet(1);
+    // Procura pela aba "SKU x DROP" primeiro, senão usa a primeira aba
+    let worksheet = workbook.getWorksheet("SKU x DROP");
+    if (!worksheet) {
+      worksheet = workbook.getWorksheet(1);
+    }
 
-  if (!worksheet) return [];
+    if (!worksheet) {
+      console.log("📄 Planilha vazia, será criada com os novos dados.");
+      return [];
+    }
 
-  const result: Rows = [];
+    const result: Rows = [];
+    let hasHeader = false;
 
-  worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-    if (rowNumber === 1) return;
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      // Detecta automaticamente se a primeira linha é cabeçalho
+      if (rowNumber === 1) {
+        const firstCell = row.getCell(1).value?.toString().toLowerCase() || "";
+        const secondCell = row.getCell(2).value?.toString().toLowerCase() || "";
 
-    const sku = row.getCell(1).value?.toString() || "";
-    const drop = row.getCell(2).value?.toString() || undefined;
-    result.push({ sku, drop });
-  });
+        // Se contém "sku" e "drop", provavelmente é cabeçalho
+        if (firstCell.includes("sku") && secondCell.includes("drop")) {
+          hasHeader = true;
+          console.log("📋 Cabeçalho detectado na primeira linha.");
+          return;
+        }
+      }
 
-  return result;
+      // Pula cabeçalho se foi detectado
+      if (hasHeader && rowNumber === 1) return;
+
+      const sku = row.getCell(1).value?.toString()?.trim() || "";
+      const drop = row.getCell(2).value?.toString()?.trim() || undefined;
+
+      // Só adiciona se tiver SKU válido
+      if (sku) {
+        result.push({ sku, drop });
+      }
+    });
+
+    console.log(`📊 ${result.length} registros existentes encontrados.`);
+    return result;
+  } catch (error: any) {
+    console.error("❌ Erro ao ler arquivo existente:", error.message);
+    console.log("📄 Arquivo será recriado.");
+    return [];
+  }
 }

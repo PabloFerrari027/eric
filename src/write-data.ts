@@ -1,5 +1,6 @@
 import { Rows } from "./types";
-import { workbook } from "./workbook";
+import { Workbook } from "exceljs";
+import * as fs from "fs";
 
 interface Input {
   filePath: string;
@@ -7,19 +8,21 @@ interface Input {
   skus: Array<string>;
 }
 
-export async function writeData(input: Input): Promise<void> {
+export async function writeData(input: Input): Promise<boolean> {
   try {
     const newSkus = input.skus.filter(
-      (sku) => !input.currentRows.some((item) => item.sku === sku)
+      (sku) => !input.currentRows.some((item) => item.sku.split("-")[0] === sku)
     );
-
-    const rows: Rows = [...input.currentRows];
 
     if (newSkus.length === 0) {
       console.log("ℹ️  Nenhum SKU novo para buscar.");
-      return;
+      return false;
     }
 
+    console.log(`🔍 Buscando ${newSkus.length} novos SKUs...`);
+
+    // Busca os dados dos novos SKUs
+    const newRows: Rows = [];
     for (const sku of newSkus) {
       console.log(`🔍 Buscando: ${sku}`);
       const url = `https://app.asana.com/api/1.0/workspaces/1202771719354212/tasks/search?opt_fields=custom_fields,name&custom_fields.1204602756616122.value=${sku}`;
@@ -51,40 +54,98 @@ export async function writeData(input: Input): Promise<void> {
               drop: drop?.display_value,
             };
             console.log(`  ➕ Adicionando: ${row.sku} - DROP: ${row.drop}`);
-            rows.push(row);
+            newRows.push(row);
           });
         }
       });
     }
 
-    console.log("💾 Salvando dados no Excel...");
+    if (newRows.length === 0) {
+      console.log("ℹ️  Nenhum dado novo encontrado na API.");
+      return false;
+    }
 
-    workbook.views = [
-      {
-        x: 0,
-        y: 0,
-        width: 10000,
-        height: 20000,
-        firstSheet: 0,
-        activeTab: 1,
-        visibility: "visible",
-      },
-    ];
+    console.log("💾 Atualizando planilha preservando formatações...");
 
-    const sheetName = "SKU x DROP";
-    let sheet = workbook.getWorksheet(sheetName);
-    if (!sheet) sheet = workbook.addWorksheet(sheetName);
+    // Carrega a planilha existente OU cria uma nova
+    const workbook = new Workbook();
+    let worksheet;
 
-    sheet.columns = [
-      { header: "SKU", key: "sku", width: 30 },
-      { header: "DROP", key: "drop", width: 30 },
-    ];
+    if (fs.existsSync(input.filePath)) {
+      // Carrega a planilha existente mantendo TODAS as formatações
+      await workbook.xlsx.readFile(input.filePath);
+      worksheet =
+        workbook.getWorksheet("SKU x DROP") || workbook.getWorksheet(1);
 
-    rows.forEach((item) => sheet.addRow({ sku: item.sku, drop: item.drop }));
+      if (!worksheet) {
+        worksheet = workbook.addWorksheet("SKU x DROP");
+        // Adiciona cabeçalhos apenas se for uma nova aba
+        worksheet.getRow(1).values = ["SKU", "DROP"];
+      }
+    } else {
+      // Cria nova planilha
+      worksheet = workbook.addWorksheet("SKU x DROP");
 
+      // Configura cabeçalhos com formatação básica
+      worksheet.columns = [
+        { header: "SKU", key: "sku", width: 30 },
+        { header: "DROP", key: "drop", width: 30 },
+      ];
+
+      // Formata cabeçalho
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE6E6FA" },
+      };
+    }
+
+    // Encontra a próxima linha vazia (após os dados existentes)
+    let lastRow = 1; // Começa após o cabeçalho
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber > lastRow) lastRow = rowNumber;
+    });
+
+    // Adiciona apenas as novas linhas, preservando formatações existentes
+    newRows.forEach((newRow, index) => {
+      const rowNumber = lastRow + 1 + index;
+      const row = worksheet.getRow(rowNumber);
+
+      // Define apenas os valores, preserva qualquer formatação existente
+      row.getCell(1).value = newRow.sku;
+      row.getCell(2).value = newRow.drop;
+
+      // Se for uma nova linha, aplica formatação básica apenas nas células com dados
+      if (rowNumber > worksheet.actualRowCount) {
+        row.getCell(1).border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+        row.getCell(2).border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      }
+
+      row.commit();
+    });
+
+    // Salva mantendo TODAS as formatações existentes
     await workbook.xlsx.writeFile(input.filePath);
-    console.log("✅ Arquivo Excel atualizado com sucesso!");
-    console.log(`📊 Total de registros: ${rows.length}`);
+
+    console.log("✅ Planilha atualizada preservando formatações existentes!");
+    console.log(`📊 Novos registros adicionados: ${newRows.length}`);
+    console.log(
+      `📋 Total de registros: ${input.currentRows.length + newRows.length}`
+    );
+
+    return true;
   } catch (error: any) {
     console.error("❌ Erro ao processar dados:", error.message);
     throw error;
