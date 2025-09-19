@@ -46,7 +46,10 @@ export async function writeData(input: Input): Promise<boolean> {
 
       // Configura cabeçalhos com formatação básica
       worksheet.columns = [
-        { header: "SKU", key: "sku", width: 30 },
+        { header: "Index", key: "index", width: 30 },
+        { header: "Código (SKU)", key: "skuVariation", width: 30 },
+        { header: "sku s tam", key: "skuPai", width: 30 },
+        { header: "Categoria", key: "category", width: 30 },
         { header: "DROP", key: "drop", width: 30 },
       ];
 
@@ -64,8 +67,11 @@ export async function writeData(input: Input): Promise<boolean> {
       const row = worksheet.getRow(rowNumber);
 
       // Define apenas os valores
-      row.getCell(1).value = newRow.sku;
-      row.getCell(2).value = newRow.drop;
+      row.getCell(1).value = newRow.index;
+      row.getCell(2).value = newRow.skuVariation;
+      row.getCell(3).value = newRow.skuPai;
+      row.getCell(4).value = newRow.category;
+      row.getCell(5).value = newRow.drop;
       row.commit();
     });
 

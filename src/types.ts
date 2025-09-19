@@ -1,5 +1,8 @@
 export interface Row {
-  sku: string;
+  index: string
+  skuVariation: string;
+  skuPai: string;
+  category: string
   drop: string | undefined;
 }
 

@@ -49,12 +49,15 @@ export async function readData(input: Input): Promise<Rows> {
       // Pula cabeçalho se foi detectado
       if (hasHeader && rowNumber === 1) return;
 
-      const sku = row.getCell(1).value?.toString()?.trim() || "";
-      const drop = row.getCell(2).value?.toString()?.trim() || undefined;
+      const index = row.getCell(1).value?.toString()?.trim() || "";
+      const skuVariation = row.getCell(2).value?.toString()?.trim() || "";
+      const skuPai = row.getCell(2).value?.toString()?.trim() || "";
+      const category = row.getCell(2).value?.toString()?.trim() || "";
+      const drop = row.getCell(2).value?.toString()?.trim() || "";
 
       // Só adiciona se tiver SKU válido
-      if (sku) {
-        result.push({ sku, drop });
+      if (skuVariation) {
+        result.push({ category, drop, index, skuPai, skuVariation });
       }
     });
 

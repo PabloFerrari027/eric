@@ -1,4 +1,4 @@
-import { Rows } from "./types";
+import { Row, Rows } from "./types";
 
 interface Input {
   filePath: string;
@@ -8,7 +8,7 @@ interface Input {
 
 export async function FetchData(input: Input): Promise<Rows> {
   const newSkus = input.skus.filter(
-    (sku) => !input.currentRows.some((item) => item.sku.split("-")[0] === sku)
+    (sku) => !input.currentRows.some((item) => item.skuPai === sku)
   );
 
   if (newSkus.length === 0) {
@@ -40,17 +40,25 @@ export async function FetchData(input: Input): Promise<Rows> {
       const drop = product.custom_fields.find(
         (item: any) => item.name.toUpperCase() === "DROP"
       );
+      
       const grid = product.custom_fields.find(
         (item: any) => item.name.toUpperCase() === "GRADE"
+      )?.display_value;
+     
+      const category = product.custom_fields.find(
+        (item: any) => item.name.toUpperCase() === "CATEGORIA"
       )?.display_value;
 
       if (grid) {
         grid.split("-").forEach((size: string) => {
-          const row = {
-            sku: `${sku}-${size}`,
+          const row: Row = {
+            index: String(newRows.length + 1),
+            skuPai: sku,
+            skuVariation: `${sku}-${size}`,
             drop: drop?.display_value,
+            category: category?.display_value,
           };
-          console.log(`  ➕ Adicionando: ${row.sku} - DROP: ${row.drop}`);
+          console.log(`  ➕ Adicionando: ${sku} - DROP: ${row.drop}`);
           newRows.push(row);
         });
       }
